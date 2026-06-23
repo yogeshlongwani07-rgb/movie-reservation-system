@@ -286,6 +286,11 @@ View Listed Movies
 - Docker Support
 - Unit Testing
 - CI/CD Pipeline
+- React Frontend
+- Admin Dashboard
+- Real-time Seat Updates (Socket.IO)
+- Booking History
+- Role-Based Access Control Enhancements
 
 ---
 
