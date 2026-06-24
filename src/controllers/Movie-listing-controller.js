@@ -54,16 +54,16 @@ async function updateMovieListing(req, res) {
 async function deleteMovieListing(req, res) {
   try {
     const id = req.params.id;
+    if (movie.createdBy.toString() !== req.user._id.toString())
+      return res
+        .status(403)
+        .json({ message: "You are not authorized", success: false });
+    
     const movie = await Movie.findByIdAndDelete(id);
     if (!movie)
       return res
         .status(404)
         .json({ message: "Movie not Found", success: false });
-
-    if (movie.createdBy.toString() !== req.user._id.toString())
-      return res
-        .status(403)
-        .json({ message: "You are not authorized", success: false });
 
     res.json({ message: "Movie Deleted", success: true });
   } catch (err) {
