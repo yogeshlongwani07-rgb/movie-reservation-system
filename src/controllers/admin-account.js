@@ -1,5 +1,3 @@
-const express = require("express");
-const router = express.Router();
 const { Admin } = require("../models/user-admin");
 const Movie = require("../models/movie-listing");
 const validator = require("validator");
