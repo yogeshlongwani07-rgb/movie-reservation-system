@@ -1,57 +1,219 @@
 openapi: 3.0.3
 info:
-  title: Distributed Quick Commerce Fulfillment Engine API
+  title: Movie Booking & Reservation System API
   version: 1.0.0
-  description: |
-    API documentation for a production-inspired quick commerce backend.
-    Covers authentication, product catalog, warehouse routing, inventory reservation,
-    cart, order placement, payment, dispatch, tracking, notifications, and analytics.
+  description: >
+    REST API for managing users, administrators, movie listings, show schedules,
+    and ticket bookings. Authentication is handled using a JWT stored in an
+    HTTP-only cookie named `token`.
 
 servers:
-  - url: http://localhost:5000/api/v1
+  - url: http://localhost:3000
     description: Local development server
 
 tags:
-  - name: Auth
-  - name: Products
-  - name: Warehouses
-  - name: Inventory
-  - name: Cart
-  - name: Orders
-  - name: Payments
-  - name: Dispatch
-  - name: Tracking
-  - name: Analytics
-  - name: Notifications
+  - name: Health
+  - name: Admin
+  - name: User
+  - name: Movie
 
 security:
-  - bearerAuth: []
+  - cookieAuth: []
 
 paths:
-  /auth/register:
+  /:
+    get:
+      tags: [Health]
+      summary: Health check
+      responses:
+        '200':
+          description: Service is running
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /admin/register:
     post:
-      tags: [Auth]
-      summary: Register a new user
+      tags: [Admin]
+      summary: Register an admin account
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RegisterRequest'
+              $ref: '#/components/schemas/AdminRegisterRequest'
+            examples:
+              default:
+                value:
+                  name: Admin Name
+                  email: admin@example.com
+                  password: secret123
+                  role: admin
+      responses:
+        '201':
+          description: Admin created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSuccessResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Unauthorized admin creation attempt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/login:
+    post:
+      tags: [Admin]
+      summary: Login as admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            examples:
+              default:
+                value:
+                  email: admin@example.com
+                  password: secret123
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSuccessResponse'
+        '400':
+          description: Invalid credentials or missing fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/logout:
+    post:
+      tags: [Admin]
+      summary: Logout admin
+      responses:
+        '200':
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogoutResponse'
+
+  /admin/delete:
+    delete:
+      tags: [Admin]
+      summary: Delete the logged-in admin and all movies created by that admin
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Admin deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/listed-movies:
+    get:
+      tags: [Admin]
+      summary: Get movies created by the logged-in admin
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: List of movies
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  movies:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Movie'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /user/register:
+    post:
+      tags: [User]
+      summary: Register a user account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRegisterRequest'
+            examples:
+              default:
+                value:
+                  name: User Name
+                  email: user@example.com
+                  password: secret123
       responses:
         '201':
           description: User created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AuthResponse'
+                $ref: '#/components/schemas/AuthSuccessResponse'
         '400':
-          description: Validation error
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
-  /auth/login:
+  /user/login:
     post:
-      tags: [Auth]
-      summary: Login user
+      tags: [User]
+      summary: Login as user
       requestBody:
         required: true
         content:
@@ -64,238 +226,204 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AuthResponse'
-        '401':
-          description: Invalid credentials
+                $ref: '#/components/schemas/AuthSuccessResponse'
+        '400':
+          description: Invalid credentials or missing fields
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Unauthorized admin-role attempt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
-  /auth/refresh-token:
+  /user/logout:
     post:
-      tags: [Auth]
-      summary: Refresh access token
-      responses:
-        '200':
-          description: Token refreshed
-        '401':
-          description: Unauthorized
-
-  /auth/logout:
-    post:
-      tags: [Auth]
-      summary: Logout current user
+      tags: [User]
+      summary: Logout user
       responses:
         '200':
           description: Logged out
-
-  /products:
-    get:
-      tags: [Products]
-      summary: List products
-      parameters:
-        - in: query
-          name: page
-          schema: { type: integer, default: 1 }
-        - in: query
-          name: limit
-          schema: { type: integer, default: 10 }
-        - in: query
-          name: search
-          schema: { type: string }
-        - in: query
-          name: category
-          schema: { type: string }
-      responses:
-        '200':
-          description: Product list
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ProductListResponse'
-    post:
-      tags: [Products]
-      summary: Create product
+                $ref: '#/components/schemas/LogoutResponse'
+
+  /user/delete:
+    delete:
+      tags: [User]
+      summary: Delete the logged-in user account
       security:
-        - bearerAuth: []
+        - cookieAuth: []
+      responses:
+        '200':
+          description: User deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /user/my-bookings:
+    get:
+      tags: [User]
+      summary: Get booking history for the logged-in user
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Booking list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bookings:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Booking'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /user/cancel-booking/{bookingId}:
+    post:
+      tags: [User]
+      summary: Cancel a booking
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Booking document id
+      responses:
+        '200':
+          description: Booking cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Booking already cancelled or invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /movie:
+    get:
+      tags: [Movie]
+      summary: Get all movies
+      responses:
+        '200':
+          description: Movie list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Movie'
+        '400':
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /movie/add:
+    post:
+      tags: [Movie]
+      summary: Create a movie listing
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MovieCreateRequest'
+            examples:
+              default:
+                value:
+                  title: Example Movie
+                  description: A sample movie description
+                  language: English
+                  duration: 120
+                  rating: 4.5
+                  price: 199
+                  shows:
+                    - showTime: "18:30"
+                      date: "2026-06-25"
+                      totalSeats: 100
+                      availableSeats: 100
+                      screen: Screen 1
       responses:
         '201':
-          description: Product created
+          description: Movie added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Validation or creation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
-  /products/{id}:
-    get:
-      tags: [Products]
-      summary: Get product by ID
+  /movie/edit/{id}:
+    put:
+      tags: [Movie]
+      summary: Update a movie listing
+      security:
+        - cookieAuth: []
       parameters:
-        - $ref: '#/components/parameters/id'
-      responses:
-        '200':
-          description: Product details
-    patch:
-      tags: [Products]
-      summary: Update product
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/id'
-      responses:
-        '200':
-          description: Product updated
-    delete:
-      tags: [Products]
-      summary: Delete product
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/id'
-      responses:
-        '200':
-          description: Product deleted
-
-  /warehouses:
-    get:
-      tags: [Warehouses]
-      summary: List warehouses
-      responses:
-        '200':
-          description: Warehouse list
-    post:
-      tags: [Warehouses]
-      summary: Create warehouse
-      security:
-        - bearerAuth: []
-      responses:
-        '201':
-          description: Warehouse created
-
-  /warehouses/{id}:
-    get:
-      tags: [Warehouses]
-      summary: Get warehouse by ID
-      parameters:
-        - $ref: '#/components/parameters/id'
-      responses:
-        '200':
-          description: Warehouse details
-    patch:
-      tags: [Warehouses]
-      summary: Update warehouse
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/id'
-      responses:
-        '200':
-          description: Warehouse updated
-    delete:
-      tags: [Warehouses]
-      summary: Delete warehouse
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/id'
-      responses:
-        '200':
-          description: Warehouse deleted
-
-  /inventory:
-    get:
-      tags: [Inventory]
-      summary: List inventory stock
-      responses:
-        '200':
-          description: Inventory list
-
-  /inventory/reserve:
-    post:
-      tags: [Inventory]
-      summary: Reserve stock for an order
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ReserveInventoryRequest'
-      responses:
-        '200':
-          description: Stock reserved
-        '409':
-          description: Insufficient stock
-
-  /inventory/release:
-    post:
-      tags: [Inventory]
-      summary: Release reserved stock
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/InventoryActionRequest'
-      responses:
-        '200':
-          description: Stock released
-
-  /inventory/commit:
-    post:
-      tags: [Inventory]
-      summary: Commit reserved stock after successful payment
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/InventoryActionRequest'
-      responses:
-        '200':
-          description: Stock committed
-
-  /cart:
-    get:
-      tags: [Cart]
-      summary: Get current cart
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: Cart details
-    delete:
-      tags: [Cart]
-      summary: Clear cart
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: Cart cleared
-
-  /cart/items:
-    post:
-      tags: [Cart]
-      summary: Add item to cart
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CartItemRequest'
-      responses:
-        '200':
-          description: Item added
-
-  /cart/items/{itemId}:
-    patch:
-      tags: [Cart]
-      summary: Update cart item quantity
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: path
-          name: itemId
+        - name: id
+          in: path
           required: true
           schema:
             type: string
@@ -304,209 +432,239 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                quantity:
-                  type: integer
-                  example: 2
+              $ref: '#/components/schemas/MovieUpdateRequest'
       responses:
         '200':
-          description: Item updated
+          description: Movie updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Invalid request or unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Movie not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /movie/delete/{id}:
     delete:
-      tags: [Cart]
-      summary: Remove item from cart
+      tags: [Movie]
+      summary: Delete a movie listing
       security:
-        - bearerAuth: []
+        - cookieAuth: []
       parameters:
-        - in: path
-          name: itemId
+        - name: id
+          in: path
           required: true
           schema:
             type: string
       responses:
         '200':
-          description: Item removed
-
-  /orders:
-    post:
-      tags: [Orders]
-      summary: Place an order
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CheckoutRequest'
-      responses:
-        '201':
-          description: Order created
+          description: Movie deleted
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/OrderResponse'
-        '409':
-          description: Inventory not available
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Movie not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /movie/shows:
     get:
-      tags: [Orders]
-      summary: List user orders
+      tags: [Movie]
+      summary: Get available shows for a given date
       security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: Order list
-
-  /orders/{id}:
-    get:
-      tags: [Orders]
-      summary: Get order by ID
-      security:
-        - bearerAuth: []
+        - cookieAuth: []
       parameters:
-        - $ref: '#/components/parameters/id'
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            example: "2026-06-25"
       responses:
         '200':
-          description: Order details
+          description: Available shows
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AvailableShow'
+        '500':
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
-  /orders/{id}/cancel:
-    patch:
-      tags: [Orders]
-      summary: Cancel order
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/id'
-      responses:
-        '200':
-          description: Order cancelled
-
-  /orders/{id}/track:
-    get:
-      tags: [Tracking]
-      summary: Track order in real time
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/id'
-      responses:
-        '200':
-          description: Tracking information
-
-  /payments:
+  /movie/bookings:
     post:
-      tags: [Payments]
-      summary: Initiate payment
+      tags: [Movie]
+      summary: Book seats for a show
       security:
-        - bearerAuth: []
+        - cookieAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PaymentRequest'
+              $ref: '#/components/schemas/BookShowRequest'
+            examples:
+              default:
+                value:
+                  movieId: 66a111111111111111111111
+                  showId: 66b222222222222222222222
+                  seats: 2
       responses:
         '200':
-          description: Payment initiated
+          description: Show booked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          description: Invalid request or insufficient seats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Movie, show, or user not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
-  /payments/{id}/refund:
-    post:
-      tags: [Payments]
-      summary: Refund payment
-      security:
-        - bearerAuth: []
+  /movie/owner/{id}:
+    get:
+      tags: [Movie]
+      summary: Get the owner (admin) of a movie
       parameters:
-        - $ref: '#/components/parameters/id'
-      responses:
-        '200':
-          description: Payment refunded
-
-  /dispatch/nearby-riders:
-    get:
-      tags: [Dispatch]
-      summary: Find nearby riders
-      security:
-        - bearerAuth: []
-      parameters:
-        - in: query
-          name: lat
+        - name: id
+          in: path
           required: true
-          schema: { type: number, format: float }
-        - in: query
-          name: lng
-          required: true
-          schema: { type: number, format: float }
+          schema:
+            type: string
       responses:
         '200':
-          description: Nearby riders
-
-  /dispatch/assign-rider:
-    post:
-      tags: [Dispatch]
-      summary: Assign best rider to order
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AssignRiderRequest'
-      responses:
-        '200':
-          description: Rider assigned
-
-  /notifications:
-    get:
-      tags: [Notifications]
-      summary: List notifications
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: Notification list
-
-  /analytics/overview:
-    get:
-      tags: [Analytics]
-      summary: Get business overview analytics
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: Analytics summary
+          description: Movie owner
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  owner:
+                    $ref: '#/components/schemas/AdminPublic'
+        '500':
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
 components:
   securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-
-  parameters:
-    id:
-      in: path
-      name: id
-      required: true
-      schema:
-        type: string
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: token
 
   schemas:
-    RegisterRequest:
+    HealthResponse:
       type: object
-      required: [name, email, password]
       properties:
-        name:
+        message:
           type: string
-          example: Rahul Sharma
-        email:
+          example: All Set
+
+    MessageResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
           type: string
-          format: email
-          example: rahul@example.com
-        password:
+      required: [success, message]
+
+    LogoutResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
           type: string
-          format: password
-          example: StrongPass123
+          example: Logged out
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+      required: [success, message]
+
+    AuthSuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+        token:
+          type: string
+      required: [success, message, token]
 
     LoginRequest:
       type: object
@@ -517,138 +675,133 @@ components:
           format: email
         password:
           type: string
-          format: password
 
-    AuthResponse:
+    AdminRegisterRequest:
       type: object
+      required: [name, email, password, role]
       properties:
-        success:
-          type: boolean
-          example: true
-        message:
+        name:
           type: string
-          example: Login successful
-        token:
+        email:
           type: string
-          example: eyJhbGciOi...
+          format: email
+        password:
+          type: string
+          minLength: 6
+        role:
+          type: string
+          enum: [admin]
 
-    ProductListResponse:
+    UserRegisterRequest:
       type: object
+      required: [name, email, password]
       properties:
-        success:
-          type: boolean
-        data:
-          type: array
-          items:
-            $ref: '#/components/schemas/Product'
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 6
 
-    Product:
+    AdminPublic:
       type: object
       properties:
         _id:
           type: string
         name:
           type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [admin, user]
+
+    MovieCreateRequest:
+      type: object
+      required: [title, description, duration, price]
+      properties:
+        title:
+          type: string
         description:
           type: string
-        category:
+        language:
           type: string
+          example: Hindi
+        duration:
+          type: number
+        rating:
+          type: number
         price:
           type: number
-          format: float
-        isAvailable:
-          type: boolean
-
-    ReserveInventoryRequest:
-      type: object
-      required: [orderId, warehouseId, items]
-      properties:
-        orderId:
-          type: string
-        warehouseId:
-          type: string
-        items:
+        shows:
           type: array
           items:
-            type: object
-            required: [productId, quantity]
-            properties:
-              productId:
-                type: string
-              quantity:
-                type: integer
-                example: 2
+            $ref: '#/components/schemas/ShowInput'
 
-    InventoryActionRequest:
+    MovieUpdateRequest:
       type: object
-      required: [orderId, warehouseId]
       properties:
-        orderId:
+        title:
           type: string
-        warehouseId:
+        description:
           type: string
+        language:
+          type: string
+        duration:
+          type: number
+        rating:
+          type: number
+        price:
+          type: number
+        shows:
+          type: array
+          items:
+            $ref: '#/components/schemas/ShowInput'
 
-    CartItemRequest:
+    ShowInput:
       type: object
-      required: [productId, quantity]
+      required: [showTime, date, totalSeats, availableSeats]
       properties:
-        productId:
+        showTime:
           type: string
-        quantity:
+          example: "18:30"
+        date:
+          type: string
+          example: "2026-06-25"
+        totalSeats:
           type: integer
-          example: 1
-
-    CheckoutRequest:
-      type: object
-      required: [addressId, paymentMethod]
-      properties:
-        addressId:
-          type: string
-        paymentMethod:
-          type: string
-          example: cod
-        couponCode:
+        availableSeats:
+          type: integer
+        screen:
           type: string
 
-    OrderResponse:
-      type: object
-      properties:
-        success:
-          type: boolean
-        data:
-          $ref: '#/components/schemas/Order'
-
-    Order:
+    Movie:
       type: object
       properties:
         _id:
           type: string
-        customerId:
+        title:
           type: string
-        warehouseId:
+        description:
           type: string
-        items:
+        language:
+          type: string
+        duration:
+          type: number
+        rating:
+          type: number
+        price:
+          type: number
+        createdBy:
+          oneOf:
+            - type: string
+            - $ref: '#/components/schemas/AdminPublic'
+        shows:
           type: array
           items:
-            $ref: '#/components/schemas/OrderItem'
-        subtotal:
-          type: number
-        tax:
-          type: number
-        deliveryFee:
-          type: number
-        totalAmount:
-          type: number
-        paymentStatus:
-          type: string
-          example: PENDING
-        orderStatus:
-          type: string
-          example: CREATED
-        riderId:
-          type: string
-        pickerId:
-          type: string
+            $ref: '#/components/schemas/Show'
         createdAt:
           type: string
           format: date-time
@@ -656,37 +809,64 @@ components:
           type: string
           format: date-time
 
-    OrderItem:
+    Show:
       type: object
       properties:
-        productId:
+        _id:
           type: string
-        quantity:
+        showTime:
+          type: string
+        date:
+          type: string
+        totalSeats:
           type: integer
+        availableSeats:
+          type: integer
+        screen:
+          type: string
+
+    AvailableShow:
+      type: object
+      properties:
+        _id:
+          type: string
+        title:
+          type: string
+        duration:
+          type: number
         price:
           type: number
+        rating:
+          type: number
+        shows:
+          $ref: '#/components/schemas/Show'
 
-    PaymentRequest:
+    Booking:
       type: object
-      required: [orderId, amount]
       properties:
-        orderId:
+        _id:
           type: string
-        amount:
-          type: number
-        method:
+        movie:
+          oneOf:
+            - type: string
+            - $ref: '#/components/schemas/Movie'
+        seats:
+          type: integer
+        showId:
           type: string
-          example: card
+        status:
+          type: string
+          enum: [Confirmed, Cancelled]
 
-    AssignRiderRequest:
+    BookShowRequest:
       type: object
-      required: [orderId, lat, lng]
+      required: [movieId, showId, seats]
       properties:
-        orderId:
+        movieId:
           type: string
-        lat:
-          type: number
-          format: float
-        lng:
-          type: number
-          format: float
+        showId:
+          type: string
+        seats:
+          type: integer
+          minimum: 1
+          maximum: 10
