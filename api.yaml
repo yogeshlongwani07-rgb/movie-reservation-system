@@ -1,0 +1,692 @@
+openapi: 3.0.3
+info:
+  title: Distributed Quick Commerce Fulfillment Engine API
+  version: 1.0.0
+  description: |
+    API documentation for a production-inspired quick commerce backend.
+    Covers authentication, product catalog, warehouse routing, inventory reservation,
+    cart, order placement, payment, dispatch, tracking, notifications, and analytics.
+
+servers:
+  - url: http://localhost:5000/api/v1
+    description: Local development server
+
+tags:
+  - name: Auth
+  - name: Products
+  - name: Warehouses
+  - name: Inventory
+  - name: Cart
+  - name: Orders
+  - name: Payments
+  - name: Dispatch
+  - name: Tracking
+  - name: Analytics
+  - name: Notifications
+
+security:
+  - bearerAuth: []
+
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Validation error
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Invalid credentials
+
+  /auth/refresh-token:
+    post:
+      tags: [Auth]
+      summary: Refresh access token
+      responses:
+        '200':
+          description: Token refreshed
+        '401':
+          description: Unauthorized
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout current user
+      responses:
+        '200':
+          description: Logged out
+
+  /products:
+    get:
+      tags: [Products]
+      summary: List products
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 10 }
+        - in: query
+          name: search
+          schema: { type: string }
+        - in: query
+          name: category
+          schema: { type: string }
+      responses:
+        '200':
+          description: Product list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductListResponse'
+    post:
+      tags: [Products]
+      summary: Create product
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: Product created
+
+  /products/{id}:
+    get:
+      tags: [Products]
+      summary: Get product by ID
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Product details
+    patch:
+      tags: [Products]
+      summary: Update product
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Product updated
+    delete:
+      tags: [Products]
+      summary: Delete product
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Product deleted
+
+  /warehouses:
+    get:
+      tags: [Warehouses]
+      summary: List warehouses
+      responses:
+        '200':
+          description: Warehouse list
+    post:
+      tags: [Warehouses]
+      summary: Create warehouse
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: Warehouse created
+
+  /warehouses/{id}:
+    get:
+      tags: [Warehouses]
+      summary: Get warehouse by ID
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Warehouse details
+    patch:
+      tags: [Warehouses]
+      summary: Update warehouse
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Warehouse updated
+    delete:
+      tags: [Warehouses]
+      summary: Delete warehouse
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Warehouse deleted
+
+  /inventory:
+    get:
+      tags: [Inventory]
+      summary: List inventory stock
+      responses:
+        '200':
+          description: Inventory list
+
+  /inventory/reserve:
+    post:
+      tags: [Inventory]
+      summary: Reserve stock for an order
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReserveInventoryRequest'
+      responses:
+        '200':
+          description: Stock reserved
+        '409':
+          description: Insufficient stock
+
+  /inventory/release:
+    post:
+      tags: [Inventory]
+      summary: Release reserved stock
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InventoryActionRequest'
+      responses:
+        '200':
+          description: Stock released
+
+  /inventory/commit:
+    post:
+      tags: [Inventory]
+      summary: Commit reserved stock after successful payment
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InventoryActionRequest'
+      responses:
+        '200':
+          description: Stock committed
+
+  /cart:
+    get:
+      tags: [Cart]
+      summary: Get current cart
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Cart details
+    delete:
+      tags: [Cart]
+      summary: Clear cart
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Cart cleared
+
+  /cart/items:
+    post:
+      tags: [Cart]
+      summary: Add item to cart
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CartItemRequest'
+      responses:
+        '200':
+          description: Item added
+
+  /cart/items/{itemId}:
+    patch:
+      tags: [Cart]
+      summary: Update cart item quantity
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: itemId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                quantity:
+                  type: integer
+                  example: 2
+      responses:
+        '200':
+          description: Item updated
+    delete:
+      tags: [Cart]
+      summary: Remove item from cart
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: itemId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Item removed
+
+  /orders:
+    post:
+      tags: [Orders]
+      summary: Place an order
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckoutRequest'
+      responses:
+        '201':
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '409':
+          description: Inventory not available
+    get:
+      tags: [Orders]
+      summary: List user orders
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Order list
+
+  /orders/{id}:
+    get:
+      tags: [Orders]
+      summary: Get order by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Order details
+
+  /orders/{id}/cancel:
+    patch:
+      tags: [Orders]
+      summary: Cancel order
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Order cancelled
+
+  /orders/{id}/track:
+    get:
+      tags: [Tracking]
+      summary: Track order in real time
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Tracking information
+
+  /payments:
+    post:
+      tags: [Payments]
+      summary: Initiate payment
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentRequest'
+      responses:
+        '200':
+          description: Payment initiated
+
+  /payments/{id}/refund:
+    post:
+      tags: [Payments]
+      summary: Refund payment
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Payment refunded
+
+  /dispatch/nearby-riders:
+    get:
+      tags: [Dispatch]
+      summary: Find nearby riders
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: lat
+          required: true
+          schema: { type: number, format: float }
+        - in: query
+          name: lng
+          required: true
+          schema: { type: number, format: float }
+      responses:
+        '200':
+          description: Nearby riders
+
+  /dispatch/assign-rider:
+    post:
+      tags: [Dispatch]
+      summary: Assign best rider to order
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignRiderRequest'
+      responses:
+        '200':
+          description: Rider assigned
+
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: List notifications
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Notification list
+
+  /analytics/overview:
+    get:
+      tags: [Analytics]
+      summary: Get business overview analytics
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Analytics summary
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    id:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: string
+
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [name, email, password]
+      properties:
+        name:
+          type: string
+          example: Rahul Sharma
+        email:
+          type: string
+          format: email
+          example: rahul@example.com
+        password:
+          type: string
+          format: password
+          example: StrongPass123
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+
+    AuthResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Login successful
+        token:
+          type: string
+          example: eyJhbGciOi...
+
+    ProductListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Product'
+
+    Product:
+      type: object
+      properties:
+        _id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        price:
+          type: number
+          format: float
+        isAvailable:
+          type: boolean
+
+    ReserveInventoryRequest:
+      type: object
+      required: [orderId, warehouseId, items]
+      properties:
+        orderId:
+          type: string
+        warehouseId:
+          type: string
+        items:
+          type: array
+          items:
+            type: object
+            required: [productId, quantity]
+            properties:
+              productId:
+                type: string
+              quantity:
+                type: integer
+                example: 2
+
+    InventoryActionRequest:
+      type: object
+      required: [orderId, warehouseId]
+      properties:
+        orderId:
+          type: string
+        warehouseId:
+          type: string
+
+    CartItemRequest:
+      type: object
+      required: [productId, quantity]
+      properties:
+        productId:
+          type: string
+        quantity:
+          type: integer
+          example: 1
+
+    CheckoutRequest:
+      type: object
+      required: [addressId, paymentMethod]
+      properties:
+        addressId:
+          type: string
+        paymentMethod:
+          type: string
+          example: cod
+        couponCode:
+          type: string
+
+    OrderResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/Order'
+
+    Order:
+      type: object
+      properties:
+        _id:
+          type: string
+        customerId:
+          type: string
+        warehouseId:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        subtotal:
+          type: number
+        tax:
+          type: number
+        deliveryFee:
+          type: number
+        totalAmount:
+          type: number
+        paymentStatus:
+          type: string
+          example: PENDING
+        orderStatus:
+          type: string
+          example: CREATED
+        riderId:
+          type: string
+        pickerId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    OrderItem:
+      type: object
+      properties:
+        productId:
+          type: string
+        quantity:
+          type: integer
+        price:
+          type: number
+
+    PaymentRequest:
+      type: object
+      required: [orderId, amount]
+      properties:
+        orderId:
+          type: string
+        amount:
+          type: number
+        method:
+          type: string
+          example: card
+
+    AssignRiderRequest:
+      type: object
+      required: [orderId, lat, lng]
+      properties:
+        orderId:
+          type: string
+        lat:
+          type: number
+          format: float
+        lng:
+          type: number
+          format: float
