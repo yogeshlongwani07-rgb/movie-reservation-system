@@ -135,24 +135,27 @@ async function bookMovieShow(req, res) {
         .json({ message: "Movie not Found", success: false });
     }
     const show = movie.shows.id(showId);
-    if (!show)
+    if (!show){
       await session.abortTransaction();
       return res
         .status(404)
         .json({ message: "Show not Found", success: false });
+    }
     
-    if (show.availableSeats < seats)
+    if (show.availableSeats < seats){
       await session.abortTransaction();
       return res
         .status(400)
         .json({ message: "Not enough seats available", success: false });
+    }
 
     const user = await User.findById(req.user._id).session(session);
-    if (!user)
+    if (!user){
       await session.abortTransaction();
       return res
         .status(404)
         .json({ message: "User not Found", success: false });
+    }
     user.bookings.push({
       movie: movieId,
       status: "Confirmed",
