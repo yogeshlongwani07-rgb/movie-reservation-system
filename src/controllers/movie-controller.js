@@ -1,6 +1,12 @@
+<<<<<<< HEAD:src/controllers/movie-controller.js
 const Movie = require("../models/movie");
 const User = require("../models/user");
 const Admin = require("../models/admin");
+=======
+const Movie = require("../models/movie-listing");
+const { Admin, User } = require("../models/user-admin");
+const mongoose = require("mongoose");
+>>>>>>> origin/main:src/controllers/Movie-listing-controller.js
 
 async function createMovieListing(req, res) {
   try {
@@ -30,8 +36,8 @@ async function allMovies(req, res) {
 
 async function updateMovieListing(req, res) {
   try {
-    const id = req.params.id;
-    const movie = await Movie.findByIdAndUpdate(id);
+    const {id} = req.params;
+    const movie = await Movie.findById(id);
     if (!movie)
       return res
         .status(404)
@@ -54,17 +60,29 @@ async function updateMovieListing(req, res) {
 
 async function deleteMovieListing(req, res) {
   try {
+<<<<<<< HEAD:src/controllers/movie-controller.js
     const id = req.params.id;
     const movie = await Movie.findByIdAndDelete(id);
+=======
+    const {id} = req.params;
+        const movie = await Movie.findById(id);
+
+        if (!movie)
+      return res
+        .status(404)
+        .json({ message: "Movie not Found", success: false });
+    
+>>>>>>> origin/main:src/controllers/Movie-listing-controller.js
     if (movie.createdBy.toString() !== req.user._id.toString())
       return res
         .status(403)
         .json({ message: "You are not authorized", success: false });
+<<<<<<< HEAD:src/controllers/movie-controller.js
+=======
+    
+    await movie.deleteOne();
+>>>>>>> origin/main:src/controllers/Movie-listing-controller.js
 
-    if (!movie)
-      return res
-        .status(404)
-        .json({ message: "Movie not Found", success: false });
 
     res.json({ message: "Movie Deleted", success: true });
   } catch (err) {
@@ -98,18 +116,16 @@ async function checkAvailableShows(req, res) {
 }
 
 async function bookMovieShow(req, res) {
+  const session = await mongoose.startSession();
   try {
     const { movieId, showId, seats } = req.body;
-    let movie = await Movie.findById(movieId);
-    if (!movie)
-      return res
-        .status(404)
-        .json({ message: "Movie not Found", success: false });
-    const show = movie.shows.id(showId);
-    if (!show)
-      return res
-        .status(404)
-        .json({ message: "Show not Found", success: false });
+    if(!mongoose.Types.ObjectId.isValid(movieId) || !mongoose.Types.ObjectId.isValid(showId) ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid movie or show ID",
+      });
+    }
+
     if (!Number.isInteger(seats)) {
       return res.status(400).json({
         message: "Seats must be an Number",
@@ -122,16 +138,38 @@ async function bookMovieShow(req, res) {
         success: false,
       });
     }
-    if (show.availableSeats < seats)
+    // using startTransaction
+    session.startTransaction();
+    
+    let movie = await Movie.findById(movieId).session(session);
+    if (!movie){
+      await session.abortTransaction();
+      return res
+        .status(404)
+        .json({ message: "Movie not Found", success: false });
+    }
+    const show = movie.shows.id(showId);
+    if (!show){
+      await session.abortTransaction();
+      return res
+        .status(404)
+        .json({ message: "Show not Found", success: false });
+    }
+    
+    if (show.availableSeats < seats){
+      await session.abortTransaction();
       return res
         .status(400)
         .json({ message: "Not enough seats available", success: false });
+    }
 
-    const user = await User.findById(req.user._id);
-    if (!user)
+    const user = await User.findById(req.user._id).session(session);
+    if (!user){
+      await session.abortTransaction();
       return res
         .status(404)
         .json({ message: "User not Found", success: false });
+    }
     user.bookings.push({
       movie: movieId,
       status: "Confirmed",
@@ -139,13 +177,22 @@ async function bookMovieShow(req, res) {
       showId: showId,
     });
     show.availableSeats -= seats;
-    await user.save();
-    await movie.save();
+    await user.save({session});
+    await movie.save({session});
+    await session.commitTransaction();
 
-    res.status(200).json({ message: "Show Booked", success: true });
+    res.status(200).json({ message: "Show Booked successfully", success: true , booking: {
+        movieId,
+        showId,
+        seats: seats,
+        status: "Confirmed",
+      }, });
   } catch (err) {
+    await session.abortTransaction();
     console.log("error", err);
     res.status(500).json({ message: "Unexpected Error", success: false });
+  }finally{
+    await session.endSession();
   }
 }
 
@@ -156,6 +203,9 @@ async function getMovieOwner(req, res) {
       "createdBy",
       "name email",
     );
+    if(!movie){
+      return res.status(404).json({message:"Movie not found", success : false})
+    }
     res.status(200).json({ owner: movie.createdBy });
   } catch (err) {
     console.log("error", err);

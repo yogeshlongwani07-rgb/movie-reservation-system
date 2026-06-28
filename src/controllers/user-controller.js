@@ -4,6 +4,8 @@ const bcrypt = require("bcrypt");
 var jwt = require("jsonwebtoken");
 const Movie = require("../models/movie");
 
+const mongoose = require("mongoose");
+
 async function registerUser(req, res) {
   try {
     const { name, password, email } = req.body;
@@ -157,10 +159,13 @@ async function checkMyBookings(req, res) {
 }
 
 async function cancelBooking(req, res) {
+  let session = await mongoose.startSession();
   try {
-    const bookingId = req.params.bookingId;
-    const user = await User.findById(req.user._id);
+    session.startTransaction();
+    const { bookingId } = req.params;
+    const user = await User.findById(req.user._id).session(session);
     if (!user) {
+      await session.abortTransaction();
       return res.status(404).json({
         message: "User not found",
         success: false,
@@ -170,12 +175,14 @@ async function cancelBooking(req, res) {
       (booking) => booking.showId.toString() === bookingId,
     );
     if (bookingIndex === -1) {
+      await session.abortTransaction();
       return res.status(404).json({
         message: "Booking not found",
         success: false,
       });
     }
     if (user.bookings[bookingIndex].status === "Cancelled") {
+      await session.abortTransaction();
       return res.status(400).json({
         message: "Booking is already cancelled",
         success: false,
@@ -183,25 +190,39 @@ async function cancelBooking(req, res) {
     }
     user.bookings[bookingIndex].status = "Cancelled";
     const movieID = user.bookings[bookingIndex].movie.toString();
-    const movie = await Movie.findById(movieID);
+    const movie = await Movie.findById(movieID).session(session);
     if (movie) {
       const show = movie.shows.id(user.bookings[bookingIndex].showId);
       if (show) {
         show.availableSeats += user.bookings[bookingIndex].seats;
+      } else {
+        await session.abortTransaction();
+        return res
+          .status(404)
+          .json({ message: "Show not found", success: false });
       }
+    } else {
+      await session.abortTransaction();
+      return res
+        .status(404)
+        .json({ message: "Movie not found", success: false });
     }
-    await movie.save();
-    await user.save();
+    await movie.save({ session });
+    await user.save({ session });
+    await session.commitTransaction();
     res.json({
       success: true,
       message: "Booking cancelled",
     });
   } catch (err) {
+    await session.abortTransaction();
     console.log("error", err);
     return res.status(500).json({
       message: "Unexpected Error",
       success: false,
     });
+  } finally {
+    await session.endSession();
   }
 }
 
