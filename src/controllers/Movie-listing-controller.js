@@ -29,7 +29,7 @@ async function allMovies(req, res) {
 
 async function updateMovieListing(req, res) {
   try {
-    const id = req.params.id;
+    const {id} = req.params;
     const movie = await Movie.findById(id);
     if (!movie)
       return res
@@ -53,8 +53,8 @@ async function updateMovieListing(req, res) {
 
 async function deleteMovieListing(req, res) {
   try {
-    const id = req.params.id;
-        const movie = await Movie.findByIdAndDelete(id);
+    const {id} = req.params;
+        const movie = await Movie.findById(id);
 
         if (!movie)
       return res
@@ -66,7 +66,7 @@ async function deleteMovieListing(req, res) {
         .status(403)
         .json({ message: "You are not authorized", success: false });
     
-
+    await movie.deleteOne();
 
 
     res.json({ message: "Movie Deleted", success: true });
