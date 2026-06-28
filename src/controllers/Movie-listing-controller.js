@@ -189,6 +189,9 @@ async function getMovieOwner(req, res) {
       "createdBy",
       "name email",
     );
+    if(!movie){
+      return res.status(404).json({message:"Movie not found", success : false})
+    }
     res.status(200).json({ owner: movie.createdBy });
   } catch (err) {
     console.log("error", err);
