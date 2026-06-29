@@ -34,8 +34,12 @@ class UserDomain {
       password: hashPassword,
       email,
     });
-    const token = generateAccessToken(newUser);
-    return { token };
+
+    const accessToken = generateAccessToken(newUser);
+    const refreshToken = generateRefreshToken(newUser);
+    newUser.refreshToken = refreshToken;
+    await newUser.save();
+    return { accessToken, refreshToken };
   }
 
   async userLogin(email, password, role) {
@@ -51,8 +55,11 @@ class UserDomain {
     if (!validatePassword) {
       throw new AppError("Invalid Credentials", 400);
     }
-    const token = generateAccessToken(user);
-    return { token };
+    const accessToken = generateAccessToken(user);
+    const refreshToken = generateRefreshToken(user);
+    user.refreshToken = refreshToken;
+    await user.save();
+    return { accessToken, refreshToken };
   }
   async userDelete(id) {
     const user = await User.findByIdAndDelete(id);
