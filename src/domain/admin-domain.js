@@ -3,6 +3,7 @@ const Admin = require("../models/admin");
 const validator = require("validator");
 const bcrypt = require("bcrypt");
 const generateToken = require("../utils/generateToken");
+const Movie = require("../models/movie");
 
 class AdminDomain {
   async createAdmin(name, password, email, role, passkey) {
@@ -41,6 +42,37 @@ class AdminDomain {
     });
     const token = generateToken(newAdmin);
     return { token };
+  }
+  async loginAdmin(email, password) {
+    if (!email || !password) {
+      throw new AppError("Missing required field", 400);
+    }
+    email = email.trim().toLowerCase();
+    const admin = await Admin.findOne({ email });
+    if (!admin) {
+      throw new AppError("Admin not found", 400);
+    }
+    const validatePassword = await bcrypt.compare(password, admin.password);
+    if (!validatePassword) {
+      throw new AppError("Invalid Credentials", 400);
+    }
+    const token = generateToken(admin);
+    return { token };
+  }
+
+  async deleteAdmin(id) {
+    await Movie.deleteMany({
+      createdBy: id,
+    });
+    const admin = await Admin.findByIdAndDelete(id);
+  }
+
+  async showAdminMovies(adminId) {
+    const admin = await Admin.findById(adminId).populate("movies");
+    if (!admin) {
+      throw new AppError("Admin not Found", 404);
+    }
+    return admin;
   }
 }
 
