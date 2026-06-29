@@ -1,8 +1,8 @@
 const User = require("../models/user");
 const validator = require("validator");
 const bcrypt = require("bcrypt");
-var jwt = require("jsonwebtoken");
 const Movie = require("../models/movie");
+const generateToken = require("../utils/generateToken");
 
 const mongoose = require("mongoose");
 
@@ -43,13 +43,7 @@ async function registerUser(req, res) {
       email,
     });
     const SECRET = process.env.SECRET_JWT;
-    const token = jwt.sign(
-      { email: newUser.email, _id: newUser._id, role: "user" },
-      SECRET,
-      {
-        expiresIn: "7h",
-      },
-    );
+    const token = generateToken(newUser);
     res.cookie("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -93,13 +87,7 @@ async function loginUser(req, res) {
         .json({ message: "Invalid Credentials", success: false });
 
     const SECRET = process.env.SECRET_JWT;
-    const token = jwt.sign(
-      { _id: user._id, email: user.email, role: user.role },
-      SECRET,
-      {
-        expiresIn: "7h",
-      },
-    );
+    const token = generateToken(user);
     res.cookie("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",

@@ -2,7 +2,7 @@ const Admin = require("../models/admin");
 const Movie = require("../models/movie");
 const validator = require("validator");
 const bcrypt = require("bcrypt");
-var jwt = require("jsonwebtoken");
+const generateToken = require("../utils/generateToken");
 
 async function registerAdmin(req, res) {
   try {
@@ -54,11 +54,7 @@ async function registerAdmin(req, res) {
       role,
     });
     const SECRET = process.env.SECRET_JWT;
-    const token = jwt.sign(
-      { role: newAdmin.role, email: newAdmin.email, _id: newAdmin._id },
-      SECRET,
-      { expiresIn: "7h" },
-    );
+    const token = generateToken(newAdmin);
     res.cookie("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -97,20 +93,13 @@ async function loginAdmin(req, res) {
         .json({ message: "Invalid Credentials", success: false });
 
     const SECRET = process.env.SECRET_JWT;
-    const token = jwt.sign(
-      { _id: admin._id, role: "admin", email: admin.email },
-      SECRET,
-      {
-        expiresIn: "7h",
-      },
-    );
+    const token = generateToken(admin);
     res.cookie("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
-
     res
       .status(200)
       .json({ message: "Your are Login!", success: true, token: token });
