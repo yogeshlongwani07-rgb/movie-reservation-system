@@ -1,5 +1,10 @@
 require("dotenv").config();
-const requiredEnvVars = ["MONGO_URL", "SECRET_JWT", "SALT_ROUNDS", "PASSKEY"];
+const requiredEnvVars = [
+  "MONGO_URL",
+  "ACCESS_TOKEN_SECRET",
+  "SALT_ROUNDS",
+  "PASSKEY",
+];
 for (const varName of requiredEnvVars) {
   if (!process.env[varName]) {
     console.error(`${varName} not found`);
@@ -33,7 +38,7 @@ if (process.env.NODE_ENV === "production") {
 }
 
 const port = process.env.PORT || 3000;
-const connectToDb = require("./src/DB/connect");
+const connectToDb = require("./src/config/connect");
 const adminRoutes = require("./src/routes/admin");
 const cookieParser = require("cookie-parser");
 const movieListingRoutes = require("./src/routes/movie-listing");

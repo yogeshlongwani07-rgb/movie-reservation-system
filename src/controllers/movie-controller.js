@@ -1,174 +1,97 @@
 const Movie = require("../models/movie");
-const User = require("../models/user");
 const Admin = require("../models/admin");
+const MovieDomain = require("../domain/movie-domain");
+const AppError = require("../utils/appError");
+const mongoose = require("mongoose");
 
-async function createMovieListing(req, res) {
+async function createMovie(req, res) {
   try {
-    const listing = await Movie.create({
-      ...req.body,
-      createdBy: req.user._id,
-    });
-    await Admin.findByIdAndUpdate(req.user._id, {
-      $push: { movies: listing._id },
-    });
+    const listing = await MovieDomain.create(req.body, req.user._id);
+    await MovieDomain.pushMovieToAdmin(req.user._id, listing._id);
     res.status(201).json({ message: "Movie added", success: true });
   } catch (err) {
     console.log("error", err);
-    res.status(400).json({ message: "Unexpected Error", success: false });
+    res.status(500).json({ message: "Unexpected Error", success: false });
   }
 }
 
-async function allMovies(req, res) {
+async function getAllMovies(req, res) {
   try {
-    const movie = await Movie.find({});
+    const movie = await MovieDomain.allMovies();
     res.status(200).send(movie);
   } catch (err) {
     console.log("error", err);
-    res.status(400).json({ message: "Unexpected Error", success: false });
+    res.status(500).json({ message: "Unexpected Error", success: false });
   }
 }
 
-async function updateMovieListing(req, res) {
+async function updateMovie(req, res) {
   try {
     const { id } = req.params;
-    const movie = await Movie.findById(id);
-    if (!movie)
-      return res
-        .status(404)
-        .json({ message: "Movie not Found", success: false });
-
-    if (movie.createdBy.toString() !== req.user._id.toString())
-      return res
-        .status(403)
-        .json({ message: "You are not authorized", success: false });
-
-    Object.assign(movie, req.body);
-    await movie.save();
+    let body = req.body;
+    const movie = await MovieDomain.updateMovie(id, req.user._id, body);
 
     res.json({ message: "Movie Updated", success: true });
   } catch (err) {
+    if (err instanceof AppError) {
+      return res
+        .status(err.statusCode)
+        .json({ message: err.message, success: false });
+    }
     console.log("error", err);
     res.status(500).json({ message: "Unexpected Error", success: false });
   }
 }
 
-async function deleteMovieListing(req, res) {
+async function deleteMovie(req, res) {
   try {
     const { id } = req.params;
-    const movie = await Movie.findById(id);
-
-    if (!movie)
-      return res
-        .status(404)
-        .json({ message: "Movie not Found", success: false });
-    if (movie.createdBy.toString() !== req.user._id.toString())
-      return res
-        .status(403)
-        .json({ message: "You are not authorized", success: false });
-
-    await movie.deleteOne();
+    const movie = await MovieDomain.deleteMovie(id, req.user._id);
 
     res.json({ message: "Movie Deleted", success: true });
   } catch (err) {
+    if (err instanceof AppError) {
+      return res
+        .status(err.statusCode)
+        .json({ message: err.message, success: false });
+    }
     console.log("error", err);
     res.status(500).json({ message: "Unexpected Error", success: false });
   }
 }
 
-async function checkAvailableShows(req, res) {
+async function getAvailableShows(req, res) {
   try {
     const { date } = req.query;
-    const shows = await Movie.aggregate([
-      { $unwind: "$shows" },
-      { $match: { "shows.date": date, "shows.availableSeats": { $gt: 0 } } },
-      {
-        $project: {
-          title: 1,
-          duration: 1,
-          price: 1,
-          rating: 1,
-          shows: "$shows",
-        },
-      },
-      { $sort: { "shows.showTime": 1 } },
-    ]);
+    const shows = await MovieDomain.checkMovieByDate(date);
     res.status(200).send(shows);
   } catch (err) {
+    if (err instanceof AppError) {
+      return res
+        .status(err.statusCode)
+        .json({ message: err.message, success: false });
+    }
     console.log("error", err);
     res.status(500).json({ message: "Unexpected Error", success: false });
   }
 }
 
-async function bookMovieShow(req, res) {
+async function createBooking(req, res) {
   const session = await mongoose.startSession();
   try {
-    const { movieId, showId, seats } = req.body;
-    if (
-      !mongoose.Types.ObjectId.isValid(movieId) ||
-      !mongoose.Types.ObjectId.isValid(showId)
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid movie or show ID",
-      });
-    }
-
-    if (!Number.isInteger(seats)) {
-      return res.status(400).json({
-        message: "Seats must be an Number",
-        success: false,
-      });
-    }
-    if (seats < 1 || seats > 10) {
-      return res.status(400).json({
-        message: "You can book between 1 and 10 seats only",
-        success: false,
-      });
-    }
-    // using startTransaction
     session.startTransaction();
 
-    let movie = await Movie.findById(movieId).session(session);
-    if (!movie) {
-      await session.abortTransaction();
-      return res
-        .status(404)
-        .json({ message: "Movie not Found", success: false });
-    }
-    const show = movie.shows.id(showId);
-    if (!show) {
-      await session.abortTransaction();
-      return res
-        .status(404)
-        .json({ message: "Show not Found", success: false });
-    }
-
-    if (show.availableSeats < seats) {
-      await session.abortTransaction();
-      return res
-        .status(400)
-        .json({ message: "Not enough seats available", success: false });
-    }
-
-    const user = await User.findById(req.user._id).session(session);
-    if (!user) {
-      await session.abortTransaction();
-      return res
-        .status(404)
-        .json({ message: "User not Found", success: false });
-    }
-    user.bookings.push({
-      movie: movieId,
-      status: "Confirmed",
-      seats: seats,
-      showId: showId,
-    });
-    show.availableSeats -= seats;
-    await user.save({ session });
-    await movie.save({ session });
+    const { movieId, showId, seats } = req.body;
+    const ticket = await MovieDomain.bookTickets(
+      movieId,
+      showId,
+      seats,
+      req.user._id,
+      session,
+    );
     await session.commitTransaction();
 
-    res.status(200).json({
+    res.status(201).json({
       message: "Show Booked successfully",
       success: true,
       booking: {
@@ -179,6 +102,12 @@ async function bookMovieShow(req, res) {
       },
     });
   } catch (err) {
+    if (err instanceof AppError) {
+      await session.abortTransaction();
+      return res
+        .status(err.statusCode)
+        .json({ message: err.message, success: false });
+    }
     await session.abortTransaction();
     console.log("error", err);
     res.status(500).json({ message: "Unexpected Error", success: false });
@@ -187,31 +116,11 @@ async function bookMovieShow(req, res) {
   }
 }
 
-async function getMovieOwner(req, res) {
-  try {
-    const movieId = req.params.id;
-    const movie = await Movie.findById(movieId).populate(
-      "createdBy",
-      "name email",
-    );
-    if (!movie) {
-      return res
-        .status(404)
-        .json({ message: "Movie not found", success: false });
-    }
-    res.status(200).json({ owner: movie.createdBy });
-  } catch (err) {
-    console.log("error", err);
-    res.status(500).json({ message: "Unexpected Error", success: false });
-  }
-}
-
 module.exports = {
-  createMovieListing,
-  updateMovieListing,
-  deleteMovieListing,
-  allMovies,
-  checkAvailableShows,
-  bookMovieShow,
-  getMovieOwner,
+  createMovie,
+  getAllMovies,
+  updateMovie,
+  deleteMovie,
+  getAvailableShows,
+  createBooking,
 };

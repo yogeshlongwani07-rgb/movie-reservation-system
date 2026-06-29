@@ -1,51 +1,23 @@
 const User = require("../models/user");
-const validator = require("validator");
-const bcrypt = require("bcrypt");
-const Movie = require("../models/movie");
-const generateToken = require("../utils/generateToken");
-
+const UserDomain = require("../domain/user-domain");
 const mongoose = require("mongoose");
+const AppError = require("../utils/appError");
+const jwt = require("jsonwebtoken");
+const { generateAccessToken } = require("../utils/generateToken");
 
 async function registerUser(req, res) {
   try {
-    const { name, password, email } = req.body;
+    let { name, password, email } = req.body;
 
-    if (!name || !password || !email)
-      return res
-        .status(400)
-        .json({ message: "Missing required field", success: false });
-
-    email = email.trim().toLowerCase();
-
-    if (!validator.isEmail(email))
-      return res.status(400).json({
-        success: false,
-        message: "Invalid email address",
-      });
-
-    const duplicateEmail = await User.findOne({ email });
-
-    if (duplicateEmail)
-      return res
-        .status(409)
-        .json({ message: "Email already exist", success: false });
-
-    if (password.length < 6)
-      return res.status(400).json({
-        message: "Password length should be more than 6",
-        success: false,
-      });
-    const saltRounds = Number(process.env.SALT_ROUNDS);
-
-    const hashPassword = await bcrypt.hash(password, saltRounds);
-
-    const newUser = await User.create({
-      name,
-      password: hashPassword,
-      email,
+    const user = await UserDomain.registerUser(name, password, email);
+    const { accessToken, refreshToken } = user;
+    res.cookie("accessToken", accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
-    const token = generateToken(newUser);
-    res.cookie("token", token, {
+    res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
@@ -53,8 +25,13 @@ async function registerUser(req, res) {
     });
     res
       .status(201)
-      .json({ message: "Account Created", success: true, token: token });
+      .json({ message: "Account Created", success: true, token: accessToken });
   } catch (err) {
+    if (err instanceof AppError) {
+      return res
+        .status(err.statusCode)
+        .json({ message: err.message, success: false });
+    }
     console.log("error", err);
     return res.status(500).json({
       message: "Unexpected Error",
@@ -65,32 +42,17 @@ async function registerUser(req, res) {
 
 async function loginUser(req, res) {
   try {
-    const { email, password, role } = req.body;
-    if (role)
-      return res.status(403).json({
-        message: "You are not authorized to create admin account",
-        success: false,
-      });
-    if (!email || !password)
-      return res
-        .status(400)
-        .json({ message: "Missing required field", success: false });
+    let { email, password, role } = req.body;
 
-    email = email.trim().toLowerCase();
-
-    const user = await User.findOne({ email });
-    if (!user)
-      return res
-        .status(400)
-        .json({ message: "User not found", success: false });
-    const validatePassword = await bcrypt.compare(password, user.password);
-    if (!validatePassword)
-      return res
-        .status(400)
-        .json({ message: "Invalid Credentials", success: false });
-
-    const token = generateToken(user);
-    res.cookie("token", token, {
+    const user = await UserDomain.userLogin(email, password, role);
+    const { accessToken, refreshToken } = user;
+    res.cookie("accessToken", accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+    res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
@@ -99,8 +61,13 @@ async function loginUser(req, res) {
 
     res
       .status(200)
-      .json({ message: "Your are Login!", success: true, token: token });
+      .json({ message: "Your are Login!", success: true, token: accessToken });
   } catch (err) {
+    if (err instanceof AppError) {
+      return res
+        .status(err.statusCode)
+        .json({ message: err.message, success: false });
+    }
     console.log("error", err);
     return res.status(500).json({
       message: "Unexpected Error",
@@ -112,14 +79,18 @@ async function loginUser(req, res) {
 async function deleteUser(req, res) {
   try {
     let id = req.user._id;
-
-    const user = await User.findByIdAndDelete(id);
+    const user = await UserDomain.userDelete(id);
 
     res.json({
       success: true,
       message: "User deleted",
     });
   } catch (err) {
+    if (err instanceof AppError) {
+      return res
+        .status(err.statusCode)
+        .json({ message: err.message, success: false });
+    }
     console.log("error", err);
     return res.status(500).json({
       message: "Unexpected Error",
@@ -131,15 +102,14 @@ async function deleteUser(req, res) {
 async function checkMyBookings(req, res) {
   try {
     const userId = req.user._id;
-    const user = await User.findById(userId).populate("bookings");
-    if (!user) {
-      return res.status(404).json({
-        message: "User not found",
-        success: false,
-      });
-    }
+    const user = await UserDomain.showMyBookings(userId);
     res.status(200).json({ bookings: user.bookings });
   } catch (err) {
+    if (err instanceof AppError) {
+      return res
+        .status(err.statusCode)
+        .json({ message: err.message, success: false });
+    }
     console.log("error", err);
     return res.status(500).json({
       message: "Unexpected Error",
@@ -153,52 +123,9 @@ async function cancelBooking(req, res) {
   try {
     session.startTransaction();
     const { bookingId } = req.params;
-    const user = await User.findById(req.user._id).session(session);
-    if (!user) {
-      await session.abortTransaction();
-      return res.status(404).json({
-        message: "User not found",
-        success: false,
-      });
-    }
-    const bookingIndex = user.bookings.findIndex(
-      (booking) => booking.showId.toString() === bookingId,
-    );
-    if (bookingIndex === -1) {
-      await session.abortTransaction();
-      return res.status(404).json({
-        message: "Booking not found",
-        success: false,
-      });
-    }
-    if (user.bookings[bookingIndex].status === "Cancelled") {
-      await session.abortTransaction();
-      return res.status(400).json({
-        message: "Booking is already cancelled",
-        success: false,
-      });
-    }
-    user.bookings[bookingIndex].status = "Cancelled";
-    const movieID = user.bookings[bookingIndex].movie.toString();
-    const movie = await Movie.findById(movieID).session(session);
-    if (movie) {
-      const show = movie.shows.id(user.bookings[bookingIndex].showId);
-      if (show) {
-        show.availableSeats += user.bookings[bookingIndex].seats;
-      } else {
-        await session.abortTransaction();
-        return res
-          .status(404)
-          .json({ message: "Show not found", success: false });
-      }
-    } else {
-      await session.abortTransaction();
-      return res
-        .status(404)
-        .json({ message: "Movie not found", success: false });
-    }
-    await movie.save({ session });
-    await user.save({ session });
+    const userId = req.user._id;
+    const user = await UserDomain.cancelBooking(bookingId, session, userId);
+
     await session.commitTransaction();
     res.json({
       success: true,
@@ -206,6 +133,11 @@ async function cancelBooking(req, res) {
     });
   } catch (err) {
     await session.abortTransaction();
+    if (err instanceof AppError) {
+      return res
+        .status(err.statusCode)
+        .json({ message: err.message, success: false });
+    }
     console.log("error", err);
     return res.status(500).json({
       message: "Unexpected Error",
@@ -216,10 +148,57 @@ async function cancelBooking(req, res) {
   }
 }
 
+async function refreshAccessToken(req, res) {
+  try {
+    const refreshToken = req.cookies.refreshToken;
+    if (!refreshToken) {
+      return res.status(401).json({
+        success: false,
+        message: "Refresh token not found",
+      });
+    }
+    const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
+    const user = await User.findById(decoded._id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    if (user.refreshToken !== refreshToken) {
+      return res.status(403).json({
+        message: "Invalid refresh token",
+      });
+    }
+
+    const accessToken = generateAccessToken(user);
+    res.cookie("accessToken", accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 15 * 60 * 1000, // 15 minutes
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Access token refreshed",
+    });
+  } catch (err) {
+    console.log(err);
+    return res.status(401).json({
+      success: false,
+      message: "Refresh token expired or invalid",
+    });
+  }
+}
+
 module.exports = {
   registerUser,
   loginUser,
   deleteUser,
   checkMyBookings,
   cancelBooking,
+  refreshAccessToken,
 };
