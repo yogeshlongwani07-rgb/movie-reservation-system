@@ -6,7 +6,7 @@ const generateToken = require("../utils/generateToken");
 
 async function registerAdmin(req, res) {
   try {
-    const { name, password, email, role, passkey } = req.body;
+    let { name, password, email, role, passkey } = req.body;
 
     if (!role)
       return res.status(403).json({
@@ -77,7 +77,7 @@ async function registerAdmin(req, res) {
 
 async function loginAdmin(req, res) {
   try {
-    const { email, password } = req.body;
+    let { email, password } = req.body;
     if (!email || !password)
       return res
         .status(400)

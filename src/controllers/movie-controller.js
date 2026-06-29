@@ -29,7 +29,8 @@ async function getAllMovies(req, res) {
 async function updateMovie(req, res) {
   try {
     const { id } = req.params;
-    const movie = await MovieDomain.updateMovie(id, req.user._id);
+    let body = req.body;
+    const movie = await MovieDomain.updateMovie(id, req.user._id, body);
 
     res.json({ message: "Movie Updated", success: true });
   } catch (err) {
@@ -79,6 +80,8 @@ async function getAvailableShows(req, res) {
 async function createBooking(req, res) {
   const session = await mongoose.startSession();
   try {
+    session.startTransaction();
+
     const { movieId, showId, seats } = req.body;
     const ticket = await MovieDomain.bookTickets(
       movieId,
@@ -87,6 +90,7 @@ async function createBooking(req, res) {
       req.user._id,
       session,
     );
+    await session.commitTransaction();
 
     res.status(200).json({
       message: "Show Booked successfully",
@@ -100,6 +104,7 @@ async function createBooking(req, res) {
     });
   } catch (err) {
     if (err instanceof AppError) {
+      await session.abortTransaction();
       return res
         .status(err.statusCode)
         .json({ message: err.message, success: false });

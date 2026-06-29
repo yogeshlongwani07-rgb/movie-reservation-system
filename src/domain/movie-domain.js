@@ -2,6 +2,7 @@ const Movie = require("../models/movie");
 const User = require("../models/user");
 const Admin = require("../models/admin");
 const AppError = require("../utils/appError");
+const mongoose = require("mongoose");
 
 class MovieDomain {
   async create(body, userId) {
@@ -21,8 +22,8 @@ class MovieDomain {
     return movie;
   }
 
-  async updateMovie(id, userId) {
-    const movie = await Movie.findById(id);
+  async updateMovie(id, userId, body) {
+    let movie = await Movie.findById(id);
     if (!movie) {
       throw new AppError("Movie not Found", 404);
     }
@@ -30,7 +31,7 @@ class MovieDomain {
       throw new AppError("You are not authorized", 403);
     }
 
-    Object.assign(movie, req.body);
+    Object.assign(movie, body);
     await movie.save();
     return movie;
   }
@@ -78,8 +79,6 @@ class MovieDomain {
     if (seats < 1 || seats > 10) {
       throw new AppError("You can book between 1 and 10 seats only", 400);
     }
-    session.startTransaction();
-
     const movie = await Movie.findById(movieId).session(session);
     if (!movie) {
       await session.abortTransaction();
@@ -110,7 +109,6 @@ class MovieDomain {
     show.availableSeats -= seats;
     await user.save({ session });
     await movie.save({ session });
-    await session.commitTransaction();
   }
 }
 

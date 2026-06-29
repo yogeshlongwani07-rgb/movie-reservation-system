@@ -8,7 +8,7 @@ const mongoose = require("mongoose");
 
 async function registerUser(req, res) {
   try {
-    const { name, password, email } = req.body;
+    let { name, password, email } = req.body;
 
     if (!name || !password || !email)
       return res
@@ -65,7 +65,7 @@ async function registerUser(req, res) {
 
 async function loginUser(req, res) {
   try {
-    const { email, password, role } = req.body;
+    let { email, password, role } = req.body;
     if (role)
       return res.status(403).json({
         message: "You are not authorized to create admin account",
