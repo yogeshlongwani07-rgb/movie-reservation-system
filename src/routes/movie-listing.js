@@ -56,7 +56,7 @@ router.post(
   "/book-show",
   isLoggedIn,
   isUser,
-  createBooking,
   validate(bookShowSchema),
+  createBooking,
 );
 module.exports = router;

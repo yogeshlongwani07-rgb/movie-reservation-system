@@ -8,7 +8,7 @@ function validate(schema, property = "body") {
     });
 
     if (error) {
-      const msg = error.details.map((d) => d.message).join(", ");
+      const msg = error.details.map(({ message }) => message);
       return next(new AppError(msg, 400));
     }
 

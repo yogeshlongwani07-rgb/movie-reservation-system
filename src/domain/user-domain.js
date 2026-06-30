@@ -1,5 +1,4 @@
 const bcrypt = require("bcrypt");
-const validator = require("validator");
 const AppError = require("../utils/appError");
 const jwt = require("jsonwebtoken");
 const UserRepository = require("../repositories/user.repository");
@@ -8,7 +7,6 @@ const {
   generateAccessToken,
   generateRefreshToken,
 } = require("../utils/generateToken");
-const User = require("../models/user");
 
 class UserDomain {
   async registerUser(name, password, email) {
@@ -35,7 +33,6 @@ class UserDomain {
   }
 
   async userLogin(email, password) {
-
     const user = await UserRepository.findByEmail(email);
     if (!user) {
       throw new AppError("User not Found", 400);

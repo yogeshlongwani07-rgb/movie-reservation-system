@@ -1,16 +1,12 @@
 const AppError = require("../utils/appError");
-const Admin = require("../models/admin");
-const validator = require("validator");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const AdminRepository = require("../repositories/admin.repository");
-
 
 const {
   generateAccessToken,
   generateRefreshToken,
 } = require("../utils/generateToken");
-const Movie = require("../models/movie");
 
 class AdminDomain {
   async createAdmin(name, password, email, role, passkey) {
@@ -55,7 +51,6 @@ class AdminDomain {
     const refreshToken = generateRefreshToken(admin);
     admin.refreshToken = refreshToken;
     await AdminRepository.save(admin);
-    // await admin.save();
     return { accessToken, refreshToken };
   }
 
