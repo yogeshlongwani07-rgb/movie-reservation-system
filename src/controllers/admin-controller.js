@@ -30,9 +30,7 @@ async function registerAdmin(req, res) {
       sameSite: "strict",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
-    res
-      .status(201)
-      .json({ message: "Account Created", success: true, token: accessToken });
+    res.status(201).json({ message: "Account Created", success: true });
   } catch (err) {
     if (err instanceof AppError) {
       return res
@@ -64,9 +62,7 @@ async function loginAdmin(req, res) {
       sameSite: "strict",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
-    res
-      .status(200)
-      .json({ message: "Your are Login!", success: true, token: accessToken });
+    res.status(200).json({ message: "Your are Login!", success: true });
   } catch (err) {
     if (err instanceof AppError) {
       return res
